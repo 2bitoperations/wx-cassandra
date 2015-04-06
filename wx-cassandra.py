@@ -57,13 +57,17 @@ def render_graph_query():
     callback = request.args.get('callback')
     inEnd = request.args.get('end')
     inStart = request.args.get('start')
+    name = request.args.get('name')
 
-    if inEnd:
+    if not name:
+        name = 'FrontPorch3'
+
+    if inEnd and inEnd != 'NaN':
         end = datetime.datetime.utcfromtimestamp(int(inEnd) / 1000)
     else:
         end = datetime.datetime.utcnow()
 
-    if inStart:
+    if inStart and inStart != 'NaN':
         start = datetime.datetime.utcfromtimestamp(int(inStart) / 1000)
     else:
         start = datetime.datetime.utcnow() - datetime.timedelta(weeks=1)
@@ -73,13 +77,12 @@ def render_graph_query():
     day = long(end_millis / 86400000)
 
     logging.debug("requesting data for day %s between %s and %s" % (day, start, end))
-    rows = session.execute(prepared_query, ['FrontPorch3', day, end_millis, start_millis])
+    rows = session.execute(prepared_query, [name, day, end_millis, start_millis])
 
     data = []
     for row in rows:
         if row.type == 'temperature':
-            logging.debug("row %s" % (row.millis))
-            data.append([row.millis, row.value])
+            data.append([long(row.millis / 1000) * 1000, row.value])
 
     return "%s(%s)" % (callback, json.dumps(data))
 
@@ -87,4 +90,4 @@ def datetime_to_epochmillis(date):
     return long((date - datetime.datetime.utcfromtimestamp(0)).total_seconds() * 1000)
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=True, host='0.0.0.0')

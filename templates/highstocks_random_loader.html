@@ -10,38 +10,41 @@
         });
 
         $(function () {
+            var names = ['FrontPorch3', 'GalaxyTemp', 'GuestTempLight'];
+            var seriesOptions = [];
+            var loadedCount = 0;
+
             /**
              * Load new data depending on the selected min and max
              */
             function afterSetExtremes(e) {
+                $.each(names, function (i, name) {
+                    var chart = $('#container').highcharts();
 
-                var chart = $('#container').highcharts();
-
-                chart.showLoading('Loading data from server...');
-                $.getJSON('http://localhost:5000/jquery_data?start=' + Math.round(e.min) +
-                '&end=' + Math.round(e.max) + '&callback=?', function (data) {
-
-                    chart.series[0].setData(data);
-                    chart.hideLoading();
+                    $.getJSON('http://' + window.location.host + '/jquery_data?start=' + Math.round(e.min) +
+                    '&end=' + Math.round(e.max) +
+                    '&name=' + name +
+                    '&callback=?', function (data) {
+                        seriesOptions[i] = {
+                            name: name,
+                            data: data
+                        };
+                        chart.series[i].setData(data);
+                    });
                 });
             }
 
-            // See source code from the JSONP handler at https://github.com/highslide-software/highcharts.com/blob/master/samples/data/from-sql.php
-            $.getJSON('http://localhost:5000/jquery_data?start={{ start_millis }}&callback=?', function (data) {
-
-                // Add a null value for the end date
-                data = [].concat(data, [[{{ start_millis }}, new Date().getUTCMilliseconds(), null, null, null]]);
-
+            createChart = function () {
                 // create the chart
                 $('#container').highcharts('StockChart', {
-                    chart : {
+                    chart: {
                         zoomType: 'x'
                     },
 
-                    navigator : {
+                    navigator: {
                         adaptToUpdatedData: false,
-                        series : {
-                            data : data
+                        series: {
+                            data: seriesOptions[0].data
                         }
                     },
 
@@ -57,50 +60,50 @@
                         text: 'Displaying 1.7 million data points in Highcharts Stock by async server loading'
                     },
 
-                    rangeSelector : {
-                        buttons: [{
-                            type: 'hour',
-                            count: 1,
-                            text: '1h'
-                        }, {
-                            type: 'day',
-                            count: 1,
-                            text: '1d'
-                        }, {
-                            type: 'month',
-                            count: 1,
-                            text: '1m'
-                        }, {
-                            type: 'year',
-                            count: 1,
-                            text: '1y'
-                        }, {
-                            type: 'all',
-                            text: 'All'
-                        }],
-                        inputEnabled: false, // it supports only days
-                        selected : 1 // all
+                    rangeSelector: {
+                        selected: 1 // all
                     },
 
-                    xAxis : {
-                        events : {
-                            afterSetExtremes : afterSetExtremes
+                    tooltip: {
+                        pointFormat: '<span style="color:{series.color}">{series.name}</span>: <b>{point.y}</b><br/>',
+                        valueDecimals: 2
+                    },
+
+                    xAxis: {
+                        events: {
+                            afterSetExtremes: afterSetExtremes
                         },
-                        minRange: 3600 * 1000 // one hour
+                        minRange: 60 * 1000
                     },
 
                     yAxis: {
                         floor: 0
                     },
 
-                    series : [{
-                        data : data,
-                        dataGrouping: {
-                            enabled: false
-                        }
-                    }]
+                    series: seriesOptions
+                });
+            };
+
+            $.each(names, function (i, name) {
+                var chart = $('#container').highcharts();
+
+                $.getJSON('http://' + window.location.host + '/jquery_data?start=' + {{ start_millis }} +
+                '&name=' + name +
+                '&callback=?', function (data) {
+                    seriesOptions[i] = {
+                        name: name,
+                        data: data
+                    };
+                    loadedCount += 1;
+
+                    console.log("loading " + name + " loaded count is " + loadedCount);
+
+                    if (loadedCount === names.length) {
+                        createChart();
+                    }
                 });
             });
+
         });
     </script>
 <div id='container' style='width: 900px; height: 500px;'></div>
