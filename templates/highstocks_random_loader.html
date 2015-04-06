@@ -3,6 +3,12 @@
     <script src="http://code.highcharts.com/stock/highstock.js"></script>
     <script src="http://code.highcharts.com/stock/modules/exporting.js"></script>
     <script type='text/javascript'>
+        Highcharts.setOptions({
+            global: {
+                useUTC: true
+            }
+        });
+
         $(function () {
             /**
              * Load new data depending on the selected min and max
@@ -24,7 +30,7 @@
             $.getJSON('http://localhost:5000/jquery_data?start={{ start_millis }}&callback=?', function (data) {
 
                 // Add a null value for the end date
-                data = [].concat(data, [[Date.now(), null, null, null, null]]);
+                data = [].concat(data, [[{{ start_millis }}, new Date().getUTCMilliseconds(), null, null, null]]);
 
                 // create the chart
                 $('#container').highcharts('StockChart', {

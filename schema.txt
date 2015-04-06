@@ -11,5 +11,5 @@ CREATE TABLE wx.wxrecord (
 	type text,
 	value double,
 	PRIMARY KEY (( station_id, day ), millis, type)
-) WITH CLUSTERING ORDER BY (millis DESC);
+);
 
