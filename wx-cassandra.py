@@ -84,15 +84,6 @@ def compact():
 
     return "done"
 
-
-@app.route('/graph')
-def render_graph():
-    return render_template('google_example_graph.html')
-
-@app.route('/graph_dynamic')
-def render_dynamic_graph():
-    return render_template('google_example_dynamic.html')
-
 @app.route('/graph_highstocks')
 def render_highstocks_example():
     week_ago = datetime.datetime.utcnow() - datetime.timedelta(weeks=1)
