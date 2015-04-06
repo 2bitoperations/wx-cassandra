@@ -1,0 +1,15 @@
+CREATE KEYSPACE wx
+WITH replication = {
+	'class' : 'SimpleStrategy',
+	'replication_factor' : 3
+};
+
+CREATE TABLE wx.wxrecord (
+	station_id text,
+	day bigint,
+	millis bigint,
+	type text,
+	value double,
+	PRIMARY KEY (( station_id, day ), millis, type)
+) WITH CLUSTERING ORDER BY (millis DESC);
+
