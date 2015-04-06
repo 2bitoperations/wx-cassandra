@@ -8,9 +8,11 @@
                 useUTC: true
             }
         });
+        // todo: get this from callback or passed in
+        var names = {{sensor_names|safe}};
 
         $(function () {
-            var names = ['FrontPorch3', 'GalaxyTemp', 'GuestTempLight'];
+
             var seriesOptions = [];
             var loadedCount = 0;
 
@@ -20,11 +22,14 @@
             function afterSetExtremes(e) {
                 $.each(names, function (i, name) {
                     var chart = $('#container').highcharts();
+                    var start = Math.round(e.min);
+                    var end = Math.round(e.max);
 
-                    $.getJSON('http://' + window.location.host + '/jquery_data?start=' + Math.round(e.min) +
-                    '&end=' + Math.round(e.max) +
+                    $.getJSON('http://' + window.location.host + '/jquery_data?start=' + start +
+                    '&end=' + end +
                     '&name=' + name +
                     '&callback=?', function (data) {
+                        console.log("in callback for async refresh of " + name + " between " + start + " and " + end);
                         seriesOptions[i] = {
                             name: name,
                             data: data
@@ -36,28 +41,24 @@
 
             createChart = function () {
                 // create the chart
-                $('#container').highcharts('StockChart', {
+                $('#all').highcharts('StockChart', {
                     chart: {
-                        zoomType: 'x'
+                        zoomType: 'x',
                     },
 
                     navigator: {
-                        adaptToUpdatedData: false,
+                        adaptToUpdatedData: true,
                         series: {
                             data: seriesOptions[0].data
                         }
                     },
 
                     scrollbar: {
-                        liveRedraw: false
+                        liveRedraw: true
                     },
 
                     title: {
-                        text: 'AAPL history by the minute from 1998 to 2011'
-                    },
-
-                    subtitle: {
-                        text: 'Displaying 1.7 million data points in Highcharts Stock by async server loading'
+                        text: 'Historical Temp'
                     },
 
                     rangeSelector: {
@@ -75,36 +76,122 @@
                         },
                         minRange: 60 * 1000
                     },
-
-                    yAxis: {
-                        floor: 0
-                    },
-
                     series: seriesOptions
                 });
             };
 
             $.each(names, function (i, name) {
-                var chart = $('#container').highcharts();
+                $.getJSON('http://' + window.location.host + '/jquery_data?start=' + {{ week_millis }} +
+                    '&name=' + name +
+                    '&callback=?', function (data) {
+                        seriesOptions[i] = {
+                            name: name,
+                            data: data
+                        };
+                        loadedCount += 1;
 
-                $.getJSON('http://' + window.location.host + '/jquery_data?start=' + {{ start_millis }} +
-                '&name=' + name +
-                '&callback=?', function (data) {
-                    seriesOptions[i] = {
-                        name: name,
-                        data: data
-                    };
-                    loadedCount += 1;
+                        console.log("loading " + name + " loaded count is " + loadedCount);
 
-                    console.log("loading " + name + " loaded count is " + loadedCount);
-
-                    if (loadedCount === names.length) {
-                        createChart();
-                    }
-                });
+                        if (loadedCount === names.length) {
+                            createChart();
+                        }
+                    });
             });
+        });
 
+
+        $(function () {
+            var seriesOptions = [];
+            var loadedCount = 0;
+
+            createLiveChart = function () {
+                // create the chart
+                $('#live').highcharts('StockChart', {
+                    chart: {
+                        zoomType: 'x',
+                        events: {
+                            load: function () {
+                                var chart = this;
+                                var lookbackMillis = 30000;
+                                setInterval(function () {
+                                    console.log("starting async append");
+                                    $.each(names, function (i, name) {
+                                        var start = (new Date).getTime() - lookbackMillis;
+
+                                        $.getJSON('http://' + window.location.host + '/jquery_data?start=' + start +
+                                        '&name=' + name +
+                                        '&callback=?', function (data) {
+                                            console.log("starting async append callback for " + name + " utc " + start);
+                                            if (data == null) {
+                                                console.log("bailing, null data");
+                                                return;
+                                            }
+                                            for (var j = 0; j < data.length; j++) {
+                                                chart.series[i].addPoint(data[j], false, true);
+                                                console.log("adding point at " + data[j][0] + " val " + data[j][1] + " for " + chart.series[i].name);
+                                            }
+                                            chart.redraw();
+                                            console.log("after redraw");
+                                        });
+                                    });
+                                }, lookbackMillis);
+                            }
+                        }
+                    },
+
+                    navigator: {
+                        adaptToUpdatedData: true,
+                        series: {
+                            data: seriesOptions[0].data
+                        }
+                    },
+
+                    scrollbar: {
+                        liveRedraw: true
+                    },
+
+                    title: {
+                        text: 'Live Temp'
+                    },
+
+                    rangeSelector: {
+                        selected: 1 // all
+                    },
+
+                    tooltip: {
+                        pointFormat: '<span style="color:{series.color}">{series.name}</span>: <b>{point.y}</b><br/>',
+                        valueDecimals: 2
+                    },
+
+                    xAxis: {
+                        events: {
+                            //afterSetExtremes: afterSetExtremes
+                        },
+                        minRange: 60 * 1000
+                    },
+                    series: seriesOptions
+                });
+            };
+
+            $.each(names, function (i, name) {
+                $.getJSON('http://' + window.location.host + '/jquery_data?start=' + {{yesterday_millis}} +
+                            '&name=' + name +
+                            '&callback=?', function (data) {
+                                seriesOptions[i] = {
+                                    name: name,
+                                    data: data
+                                };
+                                loadedCount += 1;
+
+                                console.log("loading " + name + " loaded count is " + loadedCount);
+
+                                if (loadedCount === names.length) {
+                                    createLiveChart();
+                                }
+                            });
+            });
         });
     </script>
-<div id='container' style='width: 900px; height: 500px;'></div>
+<div id='live' style='width: 900px; height: 500px;'></div>
+<div id='all' style='width: 900px; height: 500px;'></div>
 </html>

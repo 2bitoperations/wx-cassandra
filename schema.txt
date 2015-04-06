@@ -13,3 +13,11 @@ CREATE TABLE wx.wxrecord (
 	PRIMARY KEY (( station_id, day ), millis, type)
 );
 
+CREATE TABLE wx.days (
+	station_id text,
+	millis bigint,
+	type text,
+	value double,
+	PRIMARY KEY (station_id, millis, type)
+);
+

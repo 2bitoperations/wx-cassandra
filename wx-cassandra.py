@@ -1,12 +1,11 @@
 # requires:
-# pip install python cassandra-driver
+# pip install cassandra-driver
 #
 from flask import Flask, render_template, request
 import datetime
 import sys
 import json
 import logging
-import pytz
 
 rootLogger = logging.getLogger()
 rootLogger.setLevel(logging.DEBUG)
@@ -21,23 +20,70 @@ fileLogger.setFormatter(formatter)
 rootLogger.addHandler(ch)
 rootLogger.addHandler(fileLogger)
 
+FAKE_DAY_BIN = 86400000
+
 from cassandra.cluster import Cluster
 
 app = Flask(__name__)
 
 # todo: config
 cluster = Cluster(['192.168.5.34', '192.168.5.31', '192.168.5.30'])
+sensor_names = ['FrontPorch3', 'GalaxyTemp', 'GuestTempLight', 'Front Door', 'Back Door']
 session = cluster.connect()
 
 prepared_query = session.prepare("SELECT * FROM wx.wxrecord "
                                  "WHERE station_id=? "
-                                 "AND day=? "
+                                 "AND day IN (?, ?, ?) "
                                  "AND millis < ? "
                                  "AND millis > ? ")
+
+long_query = session.prepare("SELECT * FROM wx.days "
+                                 "WHERE station_id=? "
+                                 "AND millis < ? "
+                                 "AND millis > ?")
+
+compaction_select = session.prepare("SELECT * FROM wx.wxrecord "
+                                    "WHERE station_id=? "
+                                    "AND day=?")
+
+compaction_insert = session.prepare("INSERT INTO wx.days "
+                                    "(station_id, millis, type, value) "
+                                    "VALUES "
+                                    "(?, ?, ?, ?)")
 
 @app.route('/')
 def hello_world():
     return 'Hello World!'
+
+@app.route('/compact')
+def compact():
+    # compact the previous day's data for a bunch of different sensors
+
+    yesterday = datetime_to_fakeday(datetime.datetime.utcnow() - datetime.timedelta(days=0))
+
+    for sensor in sensor_names:
+        all_readings = dict()
+        logging.debug("starting to compact sensor %s for %s " % (sensor, yesterday))
+        rows = session.execute(compaction_select, [sensor, yesterday])
+
+        for row in rows:
+            # bin per 30-minute interval
+            bin_millis = datetime_to_30_bin(row.millis)
+            if bin_millis not in all_readings:
+                all_readings[bin_millis] = dict()
+            if row.type not in all_readings[bin_millis]:
+                all_readings[bin_millis][row.type] = []
+
+            all_readings[bin_millis][row.type].append(row.value)
+
+        for bin_millis, types in all_readings.iteritems():
+            for cur_type, values in types.iteritems():
+                # TODO: sum aggregation
+                mean = sum(values) / float(len(values))
+                session.execute(compaction_insert, [sensor, bin_millis, cur_type, mean])
+
+    return "done"
+
 
 @app.route('/graph')
 def render_graph():
@@ -50,7 +96,11 @@ def render_dynamic_graph():
 @app.route('/graph_highstocks')
 def render_highstocks_example():
     week_ago = datetime.datetime.utcnow() - datetime.timedelta(weeks=1)
-    return render_template('highstocks_random_loader.html', start_millis=datetime_to_epochmillis(week_ago))
+    yesterday = datetime.datetime.utcnow() - datetime.timedelta(days=1)
+    return render_template('highstocks_random_loader.html',
+                           week_millis=datetime_to_epochmillis(week_ago),
+                           yesterday_millis=datetime_to_epochmillis(yesterday),
+                           sensor_names=sensor_names)
 
 @app.route('/jquery_data')
 def render_graph_query():
@@ -74,10 +124,15 @@ def render_graph_query():
 
     end_millis = datetime_to_epochmillis(end)
     start_millis = datetime_to_epochmillis(start)
-    day = long(end_millis / 86400000)
+    day = datetime_to_fakeday(end)
 
     logging.debug("requesting data for day %s between %s and %s" % (day, start, end))
-    rows = session.execute(prepared_query, [name, day, end_millis, start_millis])
+
+    total_time = end - start
+    if total_time > datetime.timedelta(days=3):
+        rows = session.execute(long_query, [name, end_millis, start_millis])
+    else:
+        rows = session.execute(prepared_query, [name, day - 1, day, day + 1, end_millis, start_millis])
 
     data = []
     for row in rows:
@@ -88,6 +143,13 @@ def render_graph_query():
 
 def datetime_to_epochmillis(date):
     return long((date - datetime.datetime.utcfromtimestamp(0)).total_seconds() * 1000)
+
+def datetime_to_fakeday(date):
+    millis = datetime_to_epochmillis(date)
+    return long(millis / FAKE_DAY_BIN)
+
+def datetime_to_30_bin(millis):
+    return millis - (millis % 1800000)
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0')
