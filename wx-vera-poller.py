@@ -39,8 +39,13 @@ insert_prepared = session.prepare("INSERT INTO wx.wxrecord "
 
 def record_reading(device, curr_type):
     if curr_type in device:
-        logging.debug("saving %s for device %s as %s" % (curr_type, device['name'], device[curr_type]))
-        session.execute(insert_prepared, [device['name'], day, millis, curr_type, float(device[curr_type])])
+        if curr_type == 'temperature':
+            # convert to celcius. we are engineers.
+            val = (float(device[curr_type]) - 32) / 1.800
+        else:
+            val = float(device[curr_type])
+        logging.debug("saving %s for device %s as %s" % (curr_type, device['name'], val))
+        session.execute(insert_prepared, [device['name'], day, millis, curr_type, val])
 
 
 while True:

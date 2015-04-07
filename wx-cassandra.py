@@ -29,6 +29,15 @@ app = Flask(__name__)
 # todo: config
 cluster = Cluster(['192.168.5.34', '192.168.5.31', '192.168.5.30'])
 sensor_names = ['FrontPorch3', 'GalaxyTemp', 'GuestTempLight', 'Front Door', 'Back Door']
+
+def mean(vals):
+    logging.debug("using mean")
+    return sum(vals) / float(len(vals))
+
+types_and_agg = {'temperature': mean,
+                 'humidity': mean,
+                 'light': mean,
+                 'flow': sum}
 session = cluster.connect()
 
 prepared_query = session.prepare("SELECT * FROM wx.wxrecord "
@@ -51,15 +60,37 @@ compaction_insert = session.prepare("INSERT INTO wx.days "
                                     "VALUES "
                                     "(?, ?, ?, ?)")
 
+insert_prepared = session.prepare("INSERT INTO wx.wxrecord "
+                                  "(station_id, day, millis, type, value) VALUES "
+                                  "(?, ?, ?, ?, ?)")
+
+
 @app.route('/')
 def hello_world():
     return 'Hello World!'
+
+# @app.route('/convert')
+# def convert():
+#     # compact the previous day's data for a bunch of different sensors
+#
+#     yesterday = datetime_to_fakeday(datetime.datetime.utcnow() - datetime.timedelta(days=0))
+#
+#     for sensor in sensor_names:
+#         logging.debug("starting to convert sensor %s for %s " % (sensor, yesterday))
+#         rows = session.execute(compaction_select, [sensor, yesterday])
+#
+#         for row in rows:
+#             if row.type == 'temperature':
+#                 val = (row.value * 1.8) + 32
+#                 session.execute(insert_prepared, [row.station_id, row.day, row.millis, row.type, val])
+#
+#     return "done"
 
 @app.route('/compact')
 def compact():
     # compact the previous day's data for a bunch of different sensors
 
-    yesterday = datetime_to_fakeday(datetime.datetime.utcnow() - datetime.timedelta(days=0))
+    yesterday = datetime_to_fakeday(datetime.datetime.utcnow() - datetime.timedelta(days=1))
 
     for sensor in sensor_names:
         all_readings = dict()
@@ -78,9 +109,9 @@ def compact():
 
         for bin_millis, types in all_readings.iteritems():
             for cur_type, values in types.iteritems():
-                # TODO: sum aggregation
-                mean = sum(values) / float(len(values))
-                session.execute(compaction_insert, [sensor, bin_millis, cur_type, mean])
+                val = types_and_agg[cur_type](values)
+
+                session.execute(compaction_insert, [sensor, bin_millis, cur_type, val])
 
     return "done"
 
