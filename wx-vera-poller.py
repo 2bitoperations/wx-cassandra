@@ -45,7 +45,10 @@ def record_reading(device, curr_type):
         else:
             val = float(device[curr_type])
         logging.debug("saving %s for device %s as %s" % (curr_type, device['name'], val))
-        session.execute(insert_prepared, [device['name'], day, millis, curr_type, val])
+        try:
+            session.execute(insert_prepared, [device['name'], day, millis, curr_type, val])
+        except Exception, e:
+            logging.error(e)
 
 
 while True:
