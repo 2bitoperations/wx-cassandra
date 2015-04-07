@@ -67,28 +67,14 @@ insert_prepared = session.prepare("INSERT INTO wx.wxrecord "
 def hello_world():
     return 'Hello World!'
 
-# @app.route('/convert')
-# def convert():
-#     # compact the previous day's data for a bunch of different sensors
-#
-#     yesterday = datetime_to_fakeday(datetime.datetime.utcnow() - datetime.timedelta(days=0))
-#
-#     for sensor in sensor_names:
-#         logging.debug("starting to convert sensor %s for %s " % (sensor, yesterday))
-#         rows = session.execute(compaction_select, [sensor, yesterday])
-#
-#         for row in rows:
-#             if row.type == 'temperature':
-#                 val = (row.value * 1.8) + 32
-#                 session.execute(insert_prepared, [row.station_id, row.day, row.millis, row.type, val])
-#
-#     return "done"
-
 @app.route('/compact')
 def compact():
+    daysAgo = request.args.get('daysAgo')
+    if not daysAgo:
+        daysAgo = 1
     # compact the previous day's data for a bunch of different sensors
 
-    yesterday = datetime_to_fakeday(datetime.datetime.utcnow() - datetime.timedelta(days=1))
+    yesterday = datetime_to_fakeday(datetime.datetime.utcnow() - datetime.timedelta(days=daysAgo))
 
     for sensor in sensor_names:
         all_readings = dict()
