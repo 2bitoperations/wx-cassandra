@@ -6,6 +6,7 @@ import datetime
 import sys
 import json
 import logging
+from cassandra.cluster import Cluster
 
 rootLogger = logging.getLogger()
 rootLogger.setLevel(logging.DEBUG)
@@ -21,14 +22,11 @@ rootLogger.addHandler(ch)
 rootLogger.addHandler(fileLogger)
 
 FAKE_DAY_BIN = 86400000
-
-from cassandra.cluster import Cluster
-
 app = Flask(__name__)
 
 # todo: config
 cluster = Cluster(['192.168.5.34', '192.168.5.31', '192.168.5.30'])
-sensor_names = ['FrontPorch3', 'GalaxyTemp', 'GuestTempLight', 'Front Door', 'Back Door']
+sensor_names = ['FrontPorch3', 'GalaxyTemp', 'GuestTempLight', 'Front Door', 'Back Door', 'garage', 'garden']
 
 def mean(vals):
     logging.debug("using mean")
