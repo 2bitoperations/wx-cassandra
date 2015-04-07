@@ -72,6 +72,8 @@ def compact():
     daysAgo = request.args.get('daysAgo')
     if not daysAgo:
         daysAgo = 1
+    else:
+        daysAgo = int(daysAgo)
     # compact the previous day's data for a bunch of different sensors
 
     yesterday = datetime_to_fakeday(datetime.datetime.utcnow() - datetime.timedelta(days=daysAgo))
