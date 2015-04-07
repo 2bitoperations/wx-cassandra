@@ -35,7 +35,8 @@ def mean(vals):
 types_and_agg = {'temperature': mean,
                  'humidity': mean,
                  'light': mean,
-                 'flow': sum}
+                 'flow': sum,
+                 'pressure': mean}
 session = cluster.connect()
 
 prepared_query = session.prepare("SELECT * FROM wx.wxrecord "
