@@ -38,6 +38,7 @@ types_and_agg = {'temperature': mean,
                  'flow': sum,
                  'pressure': mean}
 session = cluster.connect()
+session.default_timeout = 90.0
 
 prepared_query = session.prepare("SELECT * FROM wx.wxrecord "
                                  "WHERE station_id=? "
